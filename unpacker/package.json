@@ -1,0 +1,14 @@
+{
+  "name": "static-unpacker",
+  "version": "0.1.0",
+  "description": "Dependency-free static JavaScript unpacker",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./unpacker.js",
+  "exports": {
+    ".": "./unpacker.js"
+  },
+  "bin": {
+    "static-unpacker": "./cli.mjs"
+  }
+}

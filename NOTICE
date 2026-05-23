@@ -1,0 +1,6 @@
+Static Unpacker
+
+This project includes JavaScript code ported from the original Python project:
+https://github.com/mos9527/evbunpack
+
+The original project is licensed under the Apache License, Version 2.0.
