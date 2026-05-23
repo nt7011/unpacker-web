@@ -185,6 +185,8 @@ async function handleWriteFolder() {
     if (!(await ensureReadWritePermission(directoryHandle))) {
       throw new Error("Write permission was not granted.");
     }
+    const matchMessage = await ensureOutputDirectoryMatchesInput(directoryHandle);
+    pushLog(matchMessage, "success");
 
     let written = 0;
     for (const entry of state.safeEntries) {
@@ -251,6 +253,50 @@ async function ensureReadWritePermission(handle) {
     return true;
   }
   return (await handle.requestPermission(options)) === "granted";
+}
+
+async function ensureOutputDirectoryMatchesInput(directoryHandle) {
+  const expectedName = state.directoryName;
+  const actualName = String(directoryHandle?.name ?? "");
+  if (expectedName && actualName && actualName !== expectedName) {
+    throw new Error(
+      `Selected output folder "${actualName}" does not match input folder "${expectedName}".`,
+    );
+  }
+
+  const sentinel = findOutputDirectorySentinel();
+  if (!sentinel) {
+    if (!expectedName) {
+      throw new Error("Could not verify the selected output folder.");
+    }
+    return `Output folder name matched "${expectedName}".`;
+  }
+
+  const sentinelPath = getDisplayPath(sentinel);
+  try {
+    const fileHandle = await getExistingFileHandle(directoryHandle, sentinelPath);
+    const outputFile = await fileHandle.getFile();
+    if (outputFile.size !== sentinel.size) {
+      throw new Error(
+        `expected ${formatBytes(sentinel.size)}, found ${formatBytes(outputFile.size)}`,
+      );
+    }
+  } catch (error) {
+    throw new Error(
+      `Selected output folder does not match the input folder. Could not verify ${sentinelPath}: ${error.message}`,
+    );
+  }
+
+  return `Output folder check passed using ${sentinelPath}.`;
+}
+
+async function getExistingFileHandle(rootHandle, path) {
+  const segments = normalizeOutputPath(path).split("/");
+  let directoryHandle = rootHandle;
+  for (const segment of segments.slice(0, -1)) {
+    directoryHandle = await directoryHandle.getDirectoryHandle(segment);
+  }
+  return directoryHandle.getFileHandle(segments.at(-1));
 }
 
 function render() {
@@ -406,6 +452,22 @@ function getPackedFileOptionIndexes(files) {
       || getDisplayPath(files[left]).localeCompare(getDisplayPath(files[right]));
   });
   return indexes;
+}
+
+function findOutputDirectorySentinel() {
+  const candidates = state.directoryFiles
+    .filter((file) => file !== state.packedFile)
+    .filter((file) => !isExecutableOrDllPath(getDisplayPath(file)))
+    .filter((file) => getDisplayPath(file));
+
+  candidates.sort((left, right) =>
+    Number(right.size > 0) - Number(left.size > 0)
+      || pathDepth(left) - pathDepth(right)
+      || right.size - left.size
+      || getDisplayPath(left).localeCompare(getDisplayPath(right)),
+  );
+
+  return candidates[0] ?? null;
 }
 
 function getPickedDirectoryName(files) {
