@@ -1,5 +1,5 @@
 import {
-  restoreExecutable,
+  restoreExecutableWithInfo,
   unpack,
 } from "./unpacker.js";
 import { createStoredZipBlob } from "./zip-store.mjs";
@@ -12,7 +12,7 @@ const state = {
   outputEntries: [],
   safeEntries: [],
   unsafeEntries: [],
-  peVariant: "9_70",
+  peVariant: "auto",
   busy: false,
   logs: [],
 };
@@ -106,10 +106,23 @@ async function handleExtract() {
     pushLog("Extracting virtual filesystem.", "info");
     const extracted = unpack(input);
     pushLog(`Restoring executable (${getPeVariantLabel(state.peVariant)}).`, "info");
-    const restoredExecutable = restoreExecutable(input, {
+    const restoredExecutable = restoreExecutableWithInfo(input, {
       peVariant: state.peVariant,
     });
-    const outputEntries = createOutputEntries(extracted.files, restoredExecutable, state.packedFile.name);
+    if (restoredExecutable.autoDetected) {
+      pushLog(
+        `Executable format detected: ${getPeVariantLabel(restoredExecutable.peVariant)}.`,
+        "success",
+      );
+    }
+    for (const warning of restoredExecutable.warnings) {
+      pushLog(`Executable warning: ${warning}`, "warning");
+    }
+    const outputEntries = createOutputEntries(
+      extracted.files,
+      restoredExecutable.data,
+      state.packedFile.name,
+    );
 
     state.outputEntries = outputEntries;
     state.unsafeEntries = outputEntries.filter((entry) => isExecutableOrDllPath(entry.path));
@@ -461,5 +474,8 @@ function formatBytes(bytes) {
 }
 
 function getPeVariantLabel(value) {
+  if (value === "auto") {
+    return "auto detect";
+  }
   return `${String(value).replace("_", ".")} layout`;
 }

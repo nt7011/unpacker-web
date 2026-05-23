@@ -21,18 +21,20 @@ for (const file of result.files) {
 }
 
 const restoredExe = restoreExecutable(await fileInput.files[0].arrayBuffer(), {
-  peVariant: "10_70",
+  peVariant: "auto",
 });
 ```
 
 `file.data` is a `Uint8Array`. A website can feed those bytes to a ZIP writer,
 the File System Access API, or any other static/client-side download flow.
-`restoreExecutable` returns the reconstructed PE as a `Uint8Array`.
+`restoreExecutable` returns the reconstructed PE as a `Uint8Array`. The
+executable format defaults to `9_70`, matching the original Python CLI default;
+pass `auto`, `10_70`, or `7_80` when needed.
 
 The shipped static app lets a user choose a directory, confirms `Game.exe` (or
 the largest file if no `Game.exe` is present), extracts the contents, then
 offers a full ZIP download or a browser folder write that skips `.exe` and
-`.dll` files.
+`.dll` files. The app defaults the executable format control to `auto`.
 
 ## Node helpers
 
@@ -55,8 +57,8 @@ helpers.
 
 The CLI restores the executable by default. Use `--ignore-pe` for VFS-only
 extraction or `--ignore-fs` for executable-only reconstruction. The default PE
-variant is `9_70`, matching the Python CLI default; pass `--pe-variant 10_70`
-or `--pe-variant 7_80` for those packer versions.
+variant is `9_70`; pass `--pe-variant auto`, `--pe-variant 10_70`, or
+`--pe-variant 7_80` to use another layout.
 
 `verify-fixture.mjs` expects the local ignored `transpile-test/` fixture to be
 present.

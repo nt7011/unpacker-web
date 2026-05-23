@@ -52,7 +52,9 @@ async function main() {
     ]),
   );
 
-  const restoredExecutable = restoreExecutable(input);
+  const restoredExecutable = restoreExecutable(input, {
+    peVariant: "9_70",
+  });
   actual.set("Game.exe", {
     size: restoredExecutable.byteLength,
     hash: sha256(restoredExecutable),

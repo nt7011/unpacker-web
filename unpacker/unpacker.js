@@ -47,6 +47,9 @@ const RESTORATION_HEADER_OFFSETS = {
   },
 };
 
+export const PE_VARIANTS = Object.freeze(["9_70", "10_70", "7_80"]);
+const AUTO_PE_VARIANT = "auto";
+
 const textDecoder =
   typeof TextDecoder !== "undefined" ? new TextDecoder("utf-16le") : null;
 
@@ -167,6 +170,13 @@ export function toUint8Array(input) {
   throw new TypeError("Expected an ArrayBuffer or typed array");
 }
 
+function copyBytes(input) {
+  const source = toUint8Array(input);
+  const copy = new Uint8Array(source.byteLength);
+  copy.set(source);
+  return copy;
+}
+
 export async function unpackBlob(blob, options = {}) {
   if (!blob || typeof blob.arrayBuffer !== "function") {
     throw new TypeError("Expected a Blob or File");
@@ -243,10 +253,78 @@ export function restoreExecutable(input, options = {}) {
 
 export function restoreExecutableWithInfo(input, options = {}) {
   const source = toUint8Array(input);
-  const data = source.slice();
-  const pe = parsePe(data);
   const peVariant = options.peVariant || "9_70";
+  if (peVariant === AUTO_PE_VARIANT) {
+    return restoreExecutableAuto(source);
+  }
+
+  return restoreExecutableVariant(source, peVariant, peVariant);
+}
+
+function restoreExecutableAuto(input) {
+  const attempts = [];
+  let best = null;
+
+  for (const peVariant of PE_VARIANTS) {
+    try {
+      const result = restoreExecutableVariant(input, peVariant, AUTO_PE_VARIANT);
+      const validation = scoreRestoredExecutable(result);
+      const attempt = {
+        peVariant,
+        ok: true,
+        score: validation.score,
+        warnings: result.warnings,
+        reasons: validation.reasons,
+      };
+      attempts.push(attempt);
+
+      const candidate = {
+        result: {
+          ...result,
+          autoDetected: true,
+          autoAttempts: attempts,
+        },
+        attempt,
+      };
+      if (!best || compareAutoAttempts(candidate.attempt, best.attempt) < 0) {
+        best = candidate;
+      }
+    } catch (error) {
+      attempts.push({
+        peVariant,
+        ok: false,
+        score: Number.NEGATIVE_INFINITY,
+        error: error.message || String(error),
+      });
+    }
+  }
+
+  if (!best || best.attempt.score < 40) {
+    const summary = attempts
+      .map((attempt) =>
+        attempt.ok
+          ? `${attempt.peVariant}: score ${attempt.score}`
+          : `${attempt.peVariant}: ${attempt.error}`,
+      )
+      .join("; ");
+    throw new UnpackError(
+      `Auto executable format detection failed. Choose a layout manually. ${summary}`,
+    );
+  }
+
+  best.result.autoAttempts = attempts;
+  return best.result;
+}
+
+function restoreExecutableVariant(input, peVariant, requestedPeVariant) {
+  const source = toUint8Array(input);
+  const data = copyBytes(source);
+  const pe = parsePe(data);
   const warnings = [];
+
+  if (!PE_VARIANTS.includes(peVariant)) {
+    throw new UnpackError(`Unsupported PE variant: ${peVariant}`);
+  }
 
   const packedSection1 = findPeSection(pe.sections, PACKED_SECTION_1);
   const packedSection2 = findPeSection(pe.sections, PACKED_SECTION_2);
@@ -350,6 +428,76 @@ export function restoreExecutableWithInfo(input, options = {}) {
     warnings,
     arch: pe.is64 ? "x64" : "x86",
     peVariant,
+    requestedPeVariant,
+  };
+}
+
+function compareAutoAttempts(left, right) {
+  return right.score - left.score
+    || PE_VARIANTS.indexOf(left.peVariant) - PE_VARIANTS.indexOf(right.peVariant);
+}
+
+function scoreRestoredExecutable(result) {
+  const pe = parsePe(result.data);
+  const reasons = [];
+  let score = 20;
+
+  if (
+    findPeSection(pe.sections, PACKED_SECTION_1)
+      || findPeSection(pe.sections, PACKED_SECTION_2)
+  ) {
+    reasons.push("packed sections still present");
+    score -= 60;
+  } else {
+    reasons.push("packed sections removed");
+    score += 20;
+  }
+
+  const importScore = scoreDataDirectory(pe, PE_DIRECTORY_IMPORT, "import");
+  score += importScore.score;
+  reasons.push(importScore.reason);
+
+  const relocScore = scoreDataDirectory(pe, PE_DIRECTORY_RELOC, "reloc");
+  score += relocScore.score;
+  reasons.push(relocScore.reason);
+
+  score -= result.warnings.length * 20;
+  for (const warning of result.warnings) {
+    reasons.push(`warning: ${warning}`);
+  }
+
+  return { score, reasons };
+}
+
+function scoreDataDirectory(pe, index, label) {
+  const directory = readDataDirectory(pe, index);
+  if (directory.virtualAddress === 0 || directory.size === 0) {
+    return {
+      score: label === "reloc" ? 5 : -35,
+      reason: `${label} directory is empty`,
+    };
+  }
+
+  const startSection = sectionForRva(pe.sections, directory.virtualAddress);
+  if (!startSection) {
+    return {
+      score: -45,
+      reason: `${label} directory RVA is outside restored sections`,
+    };
+  }
+
+  const lastRva = directory.virtualAddress + directory.size - 1;
+  const endSection = sectionForRva(pe.sections, lastRva);
+  if (!endSection || endSection !== startSection) {
+    return {
+      score: 10,
+      reason: `${label} directory starts in ${startSection.name} but its size crosses a section boundary`,
+    };
+  }
+
+  return {
+    score: label === "reloc" ? 30 : 45,
+    reason: `${label} directory maps to ${startSection.name}`,
   };
 }
 
@@ -1102,6 +1250,7 @@ function dataViewFor(bytes) {
 }
 
 export default {
+  PE_VARIANTS,
   UnpackError,
   aplibDecompress,
   extractFile,

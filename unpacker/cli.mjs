@@ -12,7 +12,7 @@ Options:
   --legacy-fs   Use legacy filesystem parsing.
   --ignore-fs   Restore the executable without extracting virtual files.
   --ignore-pe   Extract virtual files without restoring the executable.
-  --pe-variant  PE restoration variant: 10_70, 9_70, or 7_80. Default: 9_70.
+  --pe-variant  PE restoration variant: auto, 10_70, 9_70, or 7_80. Default: 9_70.
   --list        Print the virtual filesystem without writing files.
   --help        Show this help text.
 `;
@@ -117,7 +117,7 @@ async function main() {
     });
     const outputPath = path.join(outputDir, path.basename(inputPath));
     await writeFile(outputPath, restored.data);
-    console.log(`Restored executable to ${outputPath}`);
+    console.log(`Restored executable to ${outputPath} (${restored.peVariant})`);
     for (const warning of restored.warnings) {
       console.warn(`Warning: ${warning}`);
     }
