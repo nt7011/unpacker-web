@@ -13,6 +13,9 @@ const state = {
   safeEntries: [],
   unsafeEntries: [],
   peVariant: "auto",
+  folderWriteComplete: false,
+  selectionStatus: null,
+  outputStatus: null,
   busy: false,
   logs: [],
 };
@@ -24,13 +27,11 @@ const packedFileSelect = document.querySelector("#packed-file-select");
 const peVariantSelect = document.querySelector("#pe-variant-select");
 const downloadZipButton = document.querySelector("#download-zip-button");
 const writeFolderButton = document.querySelector("#write-folder-button");
-const outputActions = document.querySelector("#output-actions");
-const filesystemWarning = document.querySelector("#filesystem-warning");
+const nwjsReminder = document.querySelector("#nwjs-reminder");
 const selectionStatus = document.querySelector("#selection-status");
 const outputStatus = document.querySelector("#output-status");
 const directoryName = document.querySelector("#directory-name");
 const directoryFileCount = document.querySelector("#directory-file-count");
-const packedFileSummary = document.querySelector("#packed-file-summary");
 const unpackedFileCount = document.querySelector("#unpacked-file-count");
 const unpackedSize = document.querySelector("#unpacked-size");
 const unsafeFileCount = document.querySelector("#unsafe-file-count");
@@ -52,12 +53,17 @@ render();
 function handleDirectoryInput(event) {
   const files = [...event.target.files];
   resetOutput();
+  state.selectionStatus = null;
 
   if (files.length === 0) {
     state.directoryFiles = [];
     state.directoryName = "";
     state.packedFile = null;
     state.packedFileIndex = -1;
+    state.selectionStatus = {
+      message: "Directory selection was cancelled.",
+      tone: "warning",
+    };
     pushLog("Directory selection was cancelled.", "warning");
     render();
     return;
@@ -70,6 +76,11 @@ function handleDirectoryInput(event) {
   pushLog(`Selected ${state.directoryName || "directory"} with ${files.length} files.`, "success");
   if (state.packedFile) {
     pushLog(`Packed file selected: ${getDisplayPath(state.packedFile)}.`, "info");
+  } else {
+    state.selectionStatus = {
+      message: "Choose a packed file before extraction.",
+      tone: "warning",
+    };
   }
   render();
 }
@@ -79,7 +90,13 @@ function handlePackedFileChange() {
   state.packedFile = state.directoryFiles[state.packedFileIndex] ?? null;
   resetOutput();
   if (state.packedFile) {
+    state.selectionStatus = null;
     pushLog(`Packed file selected: ${getDisplayPath(state.packedFile)}.`, "info");
+  } else {
+    state.selectionStatus = {
+      message: "Choose a packed file before extraction.",
+      tone: "warning",
+    };
   }
   render();
 }
@@ -98,6 +115,10 @@ async function handleExtract() {
 
   setBusy(true);
   resetOutput();
+  state.outputStatus = {
+    message: "Extracting selected executable.",
+    tone: "neutral",
+  };
   render();
   pushLog(`Reading ${state.packedFile.name}.`, "info");
 
@@ -127,11 +148,19 @@ async function handleExtract() {
     state.outputEntries = outputEntries;
     state.unsafeEntries = outputEntries.filter((entry) => isExecutableOrDllPath(entry.path));
     state.safeEntries = outputEntries.filter((entry) => !isExecutableOrDllPath(entry.path));
+    state.outputStatus = {
+      message: `${outputEntries.length} files ready for export.`,
+      tone: "success",
+    };
     pushLog(
       `Prepared ${outputEntries.length} files (${formatBytes(sumEntrySizes(outputEntries))}).`,
       "success",
     );
   } catch (error) {
+    state.outputStatus = {
+      message: `Extraction failed: ${error.message}`,
+      tone: "error",
+    };
     pushLog(`Extraction failed: ${error.message}`, "error");
   } finally {
     setBusy(false);
@@ -158,8 +187,16 @@ async function handleDownloadZip() {
     link.click();
     link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+    state.outputStatus = {
+      message: `ZIP ready: ${formatBytes(zipBlob.size)}.`,
+      tone: "success",
+    };
     pushLog(`ZIP ready: ${formatBytes(zipBlob.size)}.`, "success");
   } catch (error) {
+    state.outputStatus = {
+      message: `ZIP creation failed: ${error.message}`,
+      tone: "error",
+    };
     pushLog(`ZIP creation failed: ${error.message}`, "error");
   } finally {
     setBusy(false);
@@ -173,7 +210,12 @@ async function handleWriteFolder() {
   }
 
   if (typeof window.showDirectoryPicker !== "function") {
+    state.outputStatus = {
+      message: "This browser does not support folder writing.",
+      tone: "error",
+    };
     pushLog("This browser does not support folder writing.", "error");
+    render();
     return;
   }
 
@@ -198,8 +240,17 @@ async function handleWriteFolder() {
       `Wrote ${written} files. Skipped ${state.unsafeEntries.length} .exe/.dll files.`,
       "success",
     );
+    state.folderWriteComplete = true;
+    state.outputStatus = {
+      message: `Wrote ${written} files. Skipped ${state.unsafeEntries.length} .exe/.dll files.`,
+      tone: "success",
+    };
   } catch (error) {
     if (error?.name !== "AbortError") {
+      state.outputStatus = {
+        message: `Folder write failed: ${error.message}`,
+        tone: "error",
+      };
       pushLog(`Folder write failed: ${error.message}`, "error");
     }
   } finally {
@@ -309,17 +360,8 @@ function render() {
 function renderSelection() {
   directoryName.textContent = state.directoryName || "None";
   directoryFileCount.textContent = String(state.directoryFiles.length);
-  packedFileSummary.textContent = state.packedFile
-    ? `${getDisplayPath(state.packedFile)} (${formatBytes(state.packedFile.size)})`
-    : "None";
 
-  setStatus(
-    selectionStatus,
-    state.directoryFiles.length > 0
-      ? "Confirm the packed file before extraction."
-      : "No directory selected.",
-    state.directoryFiles.length > 0 ? "success" : "neutral",
-  );
+  renderStatus(selectionStatus, state.selectionStatus);
 
   packedFileSelect.replaceChildren();
   if (state.directoryFiles.length === 0) {
@@ -347,21 +389,8 @@ function renderOutput() {
   unpackedFileCount.textContent = String(state.outputEntries.length);
   unpackedSize.textContent = formatBytes(totalSize);
   unsafeFileCount.textContent = String(state.unsafeEntries.length);
-
-  if (state.outputEntries.length === 0) {
-    setStatus(outputStatus, "Extracted output will appear here.", "neutral");
-    outputActions.hidden = true;
-    filesystemWarning.hidden = true;
-    return;
-  }
-
-  setStatus(
-    outputStatus,
-    `${state.outputEntries.length} files ready for export.`,
-    "success",
-  );
-  outputActions.hidden = false;
-  filesystemWarning.hidden = false;
+  nwjsReminder.hidden = !state.folderWriteComplete;
+  renderStatus(outputStatus, state.outputStatus);
 }
 
 function renderActions() {
@@ -392,6 +421,8 @@ function resetOutput() {
   state.outputEntries = [];
   state.safeEntries = [];
   state.unsafeEntries = [];
+  state.folderWriteComplete = false;
+  state.outputStatus = null;
 }
 
 function setBusy(value) {
@@ -408,50 +439,56 @@ function pushLog(message, tone = "info") {
   renderLogs();
 }
 
-function setStatus(element, message, tone) {
-  element.textContent = message;
+function renderStatus(element, status) {
+  if (!status) {
+    element.hidden = true;
+    return;
+  }
+  element.hidden = false;
+  element.textContent = status.message;
   element.classList.remove("is-neutral", "is-warning", "is-error", "is-success");
-  element.classList.add(`is-${tone}`);
+  element.classList.add(`is-${status.tone}`);
 }
 
 function chooseDefaultPackedFileIndex(files) {
-  const gameCandidates = files
-    .map((file, index) => ({ file, index }))
-    .filter(({ file }) => file.name.toLowerCase() === "game.exe")
-    .sort((a, b) => pathDepth(a.file) - pathDepth(b.file) || b.file.size - a.file.size);
-
-  if (gameCandidates.length > 0) {
-    return gameCandidates[0].index;
-  }
-
-  let largestIndex = 0;
-  for (let index = 1; index < files.length; index += 1) {
-    if (files[index].size > files[largestIndex].size) {
-      largestIndex = index;
-    }
-  }
-  return largestIndex;
+  return getPackedFileOptionIndexes(files)[0] ?? -1;
 }
 
 function getPackedFileOptionIndexes(files) {
-  const selected = state.packedFileIndex;
   const indexes = files.map((_file, index) => index);
-  indexes.sort((left, right) => {
-    if (left === selected) {
-      return -1;
-    }
-    if (right === selected) {
-      return 1;
-    }
-    const leftGame = files[left].name.toLowerCase() === "game.exe";
-    const rightGame = files[right].name.toLowerCase() === "game.exe";
-    if (leftGame !== rightGame) {
-      return leftGame ? -1 : 1;
-    }
-    return files[right].size - files[left].size
-      || getDisplayPath(files[left]).localeCompare(getDisplayPath(files[right]));
-  });
+  indexes.sort((left, right) => comparePackedFileCandidates(files[left], files[right]));
   return indexes;
+}
+
+function comparePackedFileCandidates(left, right) {
+  const leftRank = getPackedFileRank(left);
+  const rightRank = getPackedFileRank(right);
+  if (leftRank !== rightRank) {
+    return leftRank - rightRank;
+  }
+
+  if (leftRank === 0) {
+    return pathDepth(left) - pathDepth(right)
+      || right.size - left.size
+      || getDisplayPath(left).localeCompare(getDisplayPath(right));
+  }
+
+  return right.size - left.size
+    || getDisplayPath(left).localeCompare(getDisplayPath(right));
+}
+
+function getPackedFileRank(file) {
+  const name = file.name.toLowerCase();
+  if (name === "game.exe") {
+    return 0;
+  }
+  if (name.endsWith(".exe")) {
+    return 1;
+  }
+  if (name.endsWith(".dll")) {
+    return 2;
+  }
+  return 3;
 }
 
 function findOutputDirectorySentinel() {

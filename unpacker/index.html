@@ -3,31 +3,30 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Static Unpacker</title>
+    <title>Browser Based Unpacker</title>
     <link rel="stylesheet" href="./styles.css">
   </head>
   <body>
     <main class="app-shell">
+      <a class="back-button" href="../../">&larr; Back to Version Select</a>
       <section class="panel primary-panel">
-        <p class="eyebrow">Static unpacker</p>
-        <h1>Unpack a browser-selected game folder</h1>
+        <p class="eyebrow">Browser based unpacker</p>
+        <h1>Unpack a Game</h1>
         <p class="intro">
           Select the game directory, confirm the packed executable, then export the unpacked output.
         </p>
-        <div class="actions">
-          <button id="choose-directory-button" type="button">Choose Directory</button>
-          <button id="extract-button" type="button" disabled>Extract</button>
-        </div>
-        <input id="directory-input" class="visually-hidden" type="file" webkitdirectory multiple>
       </section>
 
       <section class="panel details-panel" aria-labelledby="selection-heading">
         <div class="section-heading">
           <div>
             <h2 id="selection-heading">Selection</h2>
-            <p id="selection-status" class="section-note is-neutral">No directory selected.</p>
           </div>
         </div>
+
+        <button id="choose-directory-button" class="wide-button" type="button">Choose Directory</button>
+        <p id="selection-status" class="section-note is-neutral" hidden></p>
+        <input id="directory-input" class="visually-hidden" type="file" webkitdirectory multiple>
 
         <dl class="facts">
           <div>
@@ -37,10 +36,6 @@
           <div>
             <dt>Files</dt>
             <dd id="directory-file-count">0</dd>
-          </div>
-          <div>
-            <dt>Packed file</dt>
-            <dd id="packed-file-summary">None</dd>
           </div>
         </dl>
 
@@ -58,38 +53,63 @@
         </select>
       </section>
 
-      <section class="panel output-panel" aria-labelledby="output-heading">
-        <div class="section-heading">
-          <div>
-            <h2 id="output-heading">Output</h2>
-            <p id="output-status" class="section-note is-neutral">Extracted output will appear here.</p>
+      <div class="output-stack">
+        <section class="panel output-panel" aria-labelledby="output-heading">
+          <div class="section-heading">
+            <div>
+              <h2 id="output-heading">Output</h2>
+            </div>
           </div>
-        </div>
 
-        <dl class="facts">
-          <div>
-            <dt>Unpacked files</dt>
-            <dd id="unpacked-file-count">0</dd>
-          </div>
-          <div>
-            <dt>Total size</dt>
-            <dd id="unpacked-size">0 B</dd>
-          </div>
-          <div>
-            <dt>Skipped for folder write</dt>
-            <dd id="unsafe-file-count">0</dd>
-          </div>
-        </dl>
+          <button id="extract-button" class="wide-button" type="button" disabled>Extract</button>
+          <p id="output-status" class="section-note is-neutral" hidden></p>
 
-        <div id="output-actions" class="result-actions" hidden>
-          <button id="download-zip-button" type="button">Download ZIP</button>
-          <button id="write-folder-button" type="button">Write Safe Files to Directory</button>
-        </div>
-        <p id="filesystem-warning" class="warning-note" hidden>
-          Browser folder writing checks that the selected output folder matches the input folder, then
-          skips .exe and .dll files. Update NW.js manually if the game runtime also needs replacement.
-        </p>
-      </section>
+          <dl class="facts">
+            <div>
+              <dt>Unpacked files</dt>
+              <dd id="unpacked-file-count">0</dd>
+            </div>
+            <div>
+              <dt>Total size</dt>
+              <dd id="unpacked-size">0 B</dd>
+            </div>
+            <div>
+              <dt>Skipped for folder write</dt>
+              <dd id="unsafe-file-count">0</dd>
+            </div>
+          </dl>
+
+          <div id="output-actions" class="result-actions">
+            <button id="download-zip-button" class="wide-button" type="button" disabled>
+              Download Everything as ZIP
+            </button>
+            <div class="modify-group">
+              <button id="write-folder-button" class="wide-button" type="button" disabled>
+                Modify the Game Folder
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section id="nwjs-reminder" class="panel nwjs-panel" hidden>
+          <div class="package-block">
+            <h3>Update NW.js Runtime</h3>
+            <p class="download-copy">The browser couldn't replace the old <code>Game.exe</code>.</p>
+            <p class="download-link">
+              <a
+                href="https://dl.nwjs.io/v0.110.1/nwjs-v0.110.1-win-x64.zip"
+                target="_blank"
+                rel="noopener noreferrer"
+              >nwjs-v0.110.1-win-x64.zip</a>
+            </p>
+            <ol class="manual-steps">
+              <li>Save the ZIP in the folder with <code>Game.exe</code>.</li>
+              <li>Unzip it there.</li>
+              <li>Remove old <code>Game.exe</code> and rename <code>nwjs.exe</code> to <code>Game.exe</code>.</li>
+            </ol>
+          </div>
+        </section>
+      </div>
 
       <section class="panel activity-panel" aria-labelledby="activity-heading">
         <h2 id="activity-heading">Activity</h2>
