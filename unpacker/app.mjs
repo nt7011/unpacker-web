@@ -2,7 +2,14 @@ import {
   restoreExecutableWithInfo,
   unpack,
 } from "./unpacker.js";
+import {
+  createTranslator,
+  detectPreferredLocale,
+} from "./i18n.mjs";
 import { createStoredZipBlob } from "./zip-store.mjs";
+
+const locale = detectPreferredLocale(window.navigator);
+const t = createTranslator(locale);
 
 const state = {
   directoryFiles: [],
@@ -48,7 +55,20 @@ extractButton.addEventListener("click", handleExtract);
 downloadZipButton.addEventListener("click", handleDownloadZip);
 writeFolderButton.addEventListener("click", handleWriteFolder);
 
+applyDocumentTranslations();
 render();
+
+function applyDocumentTranslations() {
+  document.documentElement.lang = locale;
+
+  for (const element of document.querySelectorAll("[data-i18n]")) {
+    element.textContent = t(element.dataset.i18n, element.dataset);
+  }
+
+  for (const element of document.querySelectorAll("[data-i18n-html]")) {
+    element.innerHTML = t(element.dataset.i18nHtml, element.dataset);
+  }
+}
 
 function handleDirectoryInput(event) {
   const files = [...event.target.files];
@@ -61,10 +81,10 @@ function handleDirectoryInput(event) {
     state.packedFile = null;
     state.packedFileIndex = -1;
     state.selectionStatus = {
-      message: "Directory selection was cancelled.",
+      message: t("log.directorySelectionCancelled"),
       tone: "warning",
     };
-    pushLog("Directory selection was cancelled.", "warning");
+    pushLog(t("log.directorySelectionCancelled"), "warning");
     render();
     return;
   }
@@ -73,12 +93,18 @@ function handleDirectoryInput(event) {
   state.directoryName = getPickedDirectoryName(files);
   state.packedFileIndex = chooseDefaultPackedFileIndex(files);
   state.packedFile = files[state.packedFileIndex] ?? null;
-  pushLog(`Selected ${state.directoryName || "directory"} with ${files.length} files.`, "success");
+  pushLog(
+    t("log.selectedDirectory", {
+      name: state.directoryName || t("selection.fieldDirectory"),
+      count: files.length,
+    }),
+    "success",
+  );
   if (state.packedFile) {
-    pushLog(`Packed file selected: ${getDisplayPath(state.packedFile)}.`, "info");
+    pushLog(t("log.packedFileSelected", { path: getDisplayPath(state.packedFile) }), "info");
   } else {
     state.selectionStatus = {
-      message: "Choose a packed file before extraction.",
+      message: t("status.choosePackedFile"),
       tone: "warning",
     };
   }
@@ -91,10 +117,10 @@ function handlePackedFileChange() {
   resetOutput();
   if (state.packedFile) {
     state.selectionStatus = null;
-    pushLog(`Packed file selected: ${getDisplayPath(state.packedFile)}.`, "info");
+    pushLog(t("log.packedFileSelected", { path: getDisplayPath(state.packedFile) }), "info");
   } else {
     state.selectionStatus = {
-      message: "Choose a packed file before extraction.",
+      message: t("status.choosePackedFile"),
       tone: "warning",
     };
   }
@@ -104,7 +130,10 @@ function handlePackedFileChange() {
 function handlePeVariantChange() {
   state.peVariant = peVariantSelect.value;
   resetOutput();
-  pushLog(`Executable format selected: ${getPeVariantLabel(state.peVariant)}.`, "info");
+  pushLog(
+    t("log.executableFormatSelected", { label: getPeVariantLabel(state.peVariant) }),
+    "info",
+  );
   render();
 }
 
@@ -116,28 +145,33 @@ async function handleExtract() {
   setBusy(true);
   resetOutput();
   state.outputStatus = {
-    message: "Extracting selected executable.",
+    message: t("status.extractingExecutable"),
     tone: "neutral",
   };
   render();
-  pushLog(`Reading ${state.packedFile.name}.`, "info");
+  pushLog(t("log.readingFile", { fileName: state.packedFile.name }), "info");
 
   try {
     const input = new Uint8Array(await state.packedFile.arrayBuffer());
-    pushLog("Extracting virtual filesystem.", "info");
+    pushLog(t("log.extractingVfs"), "info");
     const extracted = unpack(input);
-    pushLog(`Restoring executable (${getPeVariantLabel(state.peVariant)}).`, "info");
+    pushLog(
+      t("log.restoringExecutable", { label: getPeVariantLabel(state.peVariant) }),
+      "info",
+    );
     const restoredExecutable = restoreExecutableWithInfo(input, {
       peVariant: state.peVariant,
     });
     if (restoredExecutable.autoDetected) {
       pushLog(
-        `Executable format detected: ${getPeVariantLabel(restoredExecutable.peVariant)}.`,
+        t("log.executableFormatDetected", {
+          label: getPeVariantLabel(restoredExecutable.peVariant),
+        }),
         "success",
       );
     }
     for (const warning of restoredExecutable.warnings) {
-      pushLog(`Executable warning: ${warning}`, "warning");
+      pushLog(t("log.executableWarning", { message: warning }), "warning");
     }
     const outputEntries = createOutputEntries(
       extracted.files,
@@ -149,19 +183,22 @@ async function handleExtract() {
     state.unsafeEntries = outputEntries.filter((entry) => isExecutableOrDllPath(entry.path));
     state.safeEntries = outputEntries.filter((entry) => !isExecutableOrDllPath(entry.path));
     state.outputStatus = {
-      message: `${outputEntries.length} files ready for export.`,
+      message: t("status.filesReady", { count: outputEntries.length }),
       tone: "success",
     };
     pushLog(
-      `Prepared ${outputEntries.length} files (${formatBytes(sumEntrySizes(outputEntries))}).`,
+      t("log.filesPrepared", {
+        count: outputEntries.length,
+        size: formatBytes(sumEntrySizes(outputEntries)),
+      }),
       "success",
     );
   } catch (error) {
     state.outputStatus = {
-      message: `Extraction failed: ${error.message}`,
+      message: t("error.extractionFailed", { message: error.message }),
       tone: "error",
     };
-    pushLog(`Extraction failed: ${error.message}`, "error");
+    pushLog(t("error.extractionFailed", { message: error.message }), "error");
   } finally {
     setBusy(false);
     render();
@@ -174,7 +211,7 @@ async function handleDownloadZip() {
   }
 
   setBusy(true);
-  pushLog("Building ZIP archive.", "info");
+  pushLog(t("log.buildingZip"), "info");
   render();
 
   try {
@@ -188,16 +225,16 @@ async function handleDownloadZip() {
     link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     state.outputStatus = {
-      message: `ZIP ready: ${formatBytes(zipBlob.size)}.`,
+      message: t("status.zipReady", { size: formatBytes(zipBlob.size) }),
       tone: "success",
     };
-    pushLog(`ZIP ready: ${formatBytes(zipBlob.size)}.`, "success");
+    pushLog(t("status.zipReady", { size: formatBytes(zipBlob.size) }), "success");
   } catch (error) {
     state.outputStatus = {
-      message: `ZIP creation failed: ${error.message}`,
+      message: t("error.zipCreationFailed", { message: error.message }),
       tone: "error",
     };
-    pushLog(`ZIP creation failed: ${error.message}`, "error");
+    pushLog(t("error.zipCreationFailed", { message: error.message }), "error");
   } finally {
     setBusy(false);
     render();
@@ -211,10 +248,10 @@ async function handleWriteFolder() {
 
   if (typeof window.showDirectoryPicker !== "function") {
     state.outputStatus = {
-      message: "This browser does not support folder writing.",
+      message: t("error.folderWriteUnsupported"),
       tone: "error",
     };
-    pushLog("This browser does not support folder writing.", "error");
+    pushLog(t("error.folderWriteUnsupported"), "error");
     render();
     return;
   }
@@ -225,7 +262,7 @@ async function handleWriteFolder() {
   try {
     const directoryHandle = await window.showDirectoryPicker({ mode: "readwrite" });
     if (!(await ensureReadWritePermission(directoryHandle))) {
-      throw new Error("Write permission was not granted.");
+      throw new Error(t("error.writePermissionDenied"));
     }
     const matchMessage = await ensureOutputDirectoryMatchesInput(directoryHandle);
     pushLog(matchMessage, "success");
@@ -236,22 +273,23 @@ async function handleWriteFolder() {
       written += 1;
     }
 
-    pushLog(
-      `Wrote ${written} files. Skipped ${state.unsafeEntries.length} .exe/.dll files.`,
-      "success",
-    );
+    const writtenMessage = t("log.filesWritten", {
+      written,
+      skipped: state.unsafeEntries.length,
+    });
+    pushLog(writtenMessage, "success");
     state.folderWriteComplete = true;
     state.outputStatus = {
-      message: `Wrote ${written} files. Skipped ${state.unsafeEntries.length} .exe/.dll files.`,
+      message: writtenMessage,
       tone: "success",
     };
   } catch (error) {
     if (error?.name !== "AbortError") {
       state.outputStatus = {
-        message: `Folder write failed: ${error.message}`,
+        message: t("error.folderWriteFailed", { message: error.message }),
         tone: "error",
       };
-      pushLog(`Folder write failed: ${error.message}`, "error");
+      pushLog(t("error.folderWriteFailed", { message: error.message }), "error");
     }
   } finally {
     setBusy(false);
@@ -311,16 +349,16 @@ async function ensureOutputDirectoryMatchesInput(directoryHandle) {
   const actualName = String(directoryHandle?.name ?? "");
   if (expectedName && actualName && actualName !== expectedName) {
     throw new Error(
-      `Selected output folder "${actualName}" does not match input folder "${expectedName}".`,
+      t("error.outputFolderMismatch", { actualName, expectedName }),
     );
   }
 
   const sentinel = findOutputDirectorySentinel();
   if (!sentinel) {
     if (!expectedName) {
-      throw new Error("Could not verify the selected output folder.");
+      throw new Error(t("error.outputFolderUnverified"));
     }
-    return `Output folder name matched "${expectedName}".`;
+    return t("log.outputFolderNameMatched", { expectedName });
   }
 
   const sentinelPath = getDisplayPath(sentinel);
@@ -329,16 +367,22 @@ async function ensureOutputDirectoryMatchesInput(directoryHandle) {
     const outputFile = await fileHandle.getFile();
     if (outputFile.size !== sentinel.size) {
       throw new Error(
-        `expected ${formatBytes(sentinel.size)}, found ${formatBytes(outputFile.size)}`,
+        t("error.sizeMismatch", {
+          expectedSize: formatBytes(sentinel.size),
+          actualSize: formatBytes(outputFile.size),
+        }),
       );
     }
   } catch (error) {
     throw new Error(
-      `Selected output folder does not match the input folder. Could not verify ${sentinelPath}: ${error.message}`,
+      t("error.outputFolderSentinelFailed", {
+        path: sentinelPath,
+        message: error.message,
+      }),
     );
   }
 
-  return `Output folder check passed using ${sentinelPath}.`;
+  return t("log.outputFolderCheckPassed", { path: sentinelPath });
 }
 
 async function getExistingFileHandle(rootHandle, path) {
@@ -358,14 +402,14 @@ function render() {
 }
 
 function renderSelection() {
-  directoryName.textContent = state.directoryName || "None";
+  directoryName.textContent = state.directoryName || t("selection.none");
   directoryFileCount.textContent = String(state.directoryFiles.length);
 
   renderStatus(selectionStatus, state.selectionStatus);
 
   packedFileSelect.replaceChildren();
   if (state.directoryFiles.length === 0) {
-    packedFileSelect.append(new Option("Select a directory first", ""));
+    packedFileSelect.append(new Option(t("selection.selectDirectoryFirst"), ""));
     packedFileSelect.disabled = true;
     return;
   }
@@ -407,7 +451,7 @@ function renderLogs() {
   logList.textContent = "";
   const entries = state.logs.length > 0
     ? state.logs
-    : [{ message: "Waiting for a directory selection.", tone: "info" }];
+    : [{ message: t("log.waitingForDirectory"), tone: "info" }];
 
   for (const entry of entries) {
     const item = document.createElement("li");
@@ -533,7 +577,7 @@ function normalizeOutputPath(path) {
     !normalized
       || segments.some((segment) => !segment || segment === "." || segment === "..")
   ) {
-    throw new Error(`Invalid output path: ${path}`);
+    throw new Error(t("error.invalidOutputPath", { path }));
   }
   return segments.join("/");
 }
@@ -574,7 +618,7 @@ function formatBytes(bytes) {
 
 function getPeVariantLabel(value) {
   if (value === "auto") {
-    return "auto detect";
+    return t("pe.auto");
   }
-  return `${String(value).replace("_", ".")} layout`;
+  return t("pe.layout", { version: String(value).replace("_", ".") });
 }

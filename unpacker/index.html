@@ -3,16 +3,16 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Browser Based Unpacker</title>
+    <title data-i18n="document.title">Browser Based Unpacker</title>
     <link rel="stylesheet" href="./styles.css">
   </head>
   <body>
     <main class="app-shell">
-      <a class="back-button" href="../../">&larr; Back to Version Select</a>
+      <a class="back-button" href="../../" data-i18n="nav.goBack">&larr; Back to Version Select</a>
       <section class="panel primary-panel">
-        <p class="eyebrow">Browser based unpacker</p>
-        <h1>Unpack a Game</h1>
-        <p class="intro">
+        <p class="eyebrow" data-i18n="page.eyebrow">Browser based unpacker</p>
+        <h1 data-i18n="page.heading">Unpack a Game</h1>
+        <p class="intro" data-i18n="page.intro">
           Select the game directory, confirm the packed executable, then export the unpacked output.
         </p>
       </section>
@@ -20,36 +20,36 @@
       <section class="panel details-panel" aria-labelledby="selection-heading">
         <div class="section-heading">
           <div>
-            <h2 id="selection-heading">Selection</h2>
+            <h2 id="selection-heading" data-i18n="section.selection">Selection</h2>
           </div>
         </div>
 
-        <button id="choose-directory-button" class="wide-button" type="button">Choose Directory</button>
+        <button id="choose-directory-button" class="wide-button" type="button" data-i18n="button.chooseDirectory">Choose Directory</button>
         <p id="selection-status" class="section-note is-neutral" hidden></p>
         <input id="directory-input" class="visually-hidden" type="file" webkitdirectory multiple>
 
         <dl class="facts">
           <div>
-            <dt>Directory</dt>
+            <dt data-i18n="selection.fieldDirectory">Directory</dt>
             <dd id="directory-name">None</dd>
           </div>
           <div>
-            <dt>Files</dt>
+            <dt data-i18n="selection.fieldFiles">Files</dt>
             <dd id="directory-file-count">0</dd>
           </div>
         </dl>
 
-        <label class="field-label" for="packed-file-select">Packed file</label>
+        <label class="field-label" for="packed-file-select" data-i18n="selection.packedFile">Packed file</label>
         <select id="packed-file-select" disabled>
-          <option value="">Select a directory first</option>
+          <option value="" data-i18n="selection.selectDirectoryFirst">Select a directory first</option>
         </select>
 
-        <label class="field-label" for="pe-variant-select">Executable format</label>
+        <label class="field-label" for="pe-variant-select" data-i18n="selection.executableFormat">Executable format</label>
         <select id="pe-variant-select">
-          <option value="auto">Auto detect</option>
-          <option value="9_70">9.70 layout</option>
-          <option value="10_70">10.70 layout</option>
-          <option value="7_80">7.80 layout</option>
+          <option value="auto" data-i18n="pe.auto">Auto detect</option>
+          <option value="9_70" data-i18n="pe.layout" data-version="9.70">9.70 layout</option>
+          <option value="10_70" data-i18n="pe.layout" data-version="10.70">10.70 layout</option>
+          <option value="7_80" data-i18n="pe.layout" data-version="7.80">7.80 layout</option>
         </select>
       </section>
 
@@ -57,34 +57,34 @@
         <section class="panel output-panel" aria-labelledby="output-heading">
           <div class="section-heading">
             <div>
-              <h2 id="output-heading">Output</h2>
+              <h2 id="output-heading" data-i18n="section.output">Output</h2>
             </div>
           </div>
 
-          <button id="extract-button" class="wide-button" type="button" disabled>Extract</button>
+          <button id="extract-button" class="wide-button" type="button" disabled data-i18n="button.extract">Extract</button>
           <p id="output-status" class="section-note is-neutral" hidden></p>
 
           <dl class="facts">
             <div>
-              <dt>Unpacked files</dt>
+              <dt data-i18n="output.fieldUnpackedFiles">Unpacked files</dt>
               <dd id="unpacked-file-count">0</dd>
             </div>
             <div>
-              <dt>Total size</dt>
+              <dt data-i18n="output.fieldTotalSize">Total size</dt>
               <dd id="unpacked-size">0 B</dd>
             </div>
             <div>
-              <dt>Skipped for folder write</dt>
+              <dt data-i18n="output.fieldSkippedForFolderWrite">Skipped for folder write</dt>
               <dd id="unsafe-file-count">0</dd>
             </div>
           </dl>
 
           <div id="output-actions" class="result-actions">
-            <button id="download-zip-button" class="wide-button" type="button" disabled>
+            <button id="download-zip-button" class="wide-button" type="button" disabled data-i18n="button.downloadZip">
               Download Everything as ZIP
             </button>
             <div class="modify-group">
-              <button id="write-folder-button" class="wide-button" type="button" disabled>
+              <button id="write-folder-button" class="wide-button" type="button" disabled data-i18n="button.writeFolder">
                 Modify the Game Folder
               </button>
             </div>
@@ -93,28 +93,29 @@
 
         <section id="nwjs-reminder" class="panel nwjs-panel" hidden>
           <div class="package-block">
-            <h3>Update NW.js Runtime</h3>
-            <p class="download-copy">The browser couldn't replace the old <code>Game.exe</code>.</p>
+            <h3 data-i18n="download.heading">Update NW.js Runtime</h3>
+            <p class="download-copy" data-i18n-html="download.copy">The browser couldn't replace the old <code>Game.exe</code>.</p>
             <p class="download-link">
               <a
                 href="https://dl.nwjs.io/v0.110.1/nwjs-v0.110.1-win-x64.zip"
                 target="_blank"
                 rel="noopener noreferrer"
+                data-i18n="download.link"
               >nwjs-v0.110.1-win-x64.zip</a>
             </p>
             <ol class="manual-steps">
-              <li>Save the ZIP in the folder with <code>Game.exe</code>.</li>
-              <li>Unzip it there.</li>
-              <li>Remove old <code>Game.exe</code> and rename <code>nwjs.exe</code> to <code>Game.exe</code>.</li>
+              <li data-i18n-html="download.step1">Save the ZIP in the folder with <code>Game.exe</code>.</li>
+              <li data-i18n="download.step2">Unzip it there.</li>
+              <li data-i18n-html="download.step3">Remove old <code>Game.exe</code> and rename <code>nwjs.exe</code> to <code>Game.exe</code>.</li>
             </ol>
           </div>
         </section>
       </div>
 
       <section class="panel activity-panel" aria-labelledby="activity-heading">
-        <h2 id="activity-heading">Activity</h2>
+        <h2 id="activity-heading" data-i18n="section.activity">Activity</h2>
         <ol id="log-list" class="log-list">
-          <li class="log-entry info">Waiting for a directory selection.</li>
+          <li class="log-entry info" data-i18n="log.waitingForDirectory">Waiting for a directory selection.</li>
         </ol>
       </section>
     </main>
