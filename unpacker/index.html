@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Static Unpacker</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="panel primary-panel">
+        <p class="eyebrow">Static unpacker</p>
+        <h1>Unpack a browser-selected game folder</h1>
+        <p class="intro">
+          Select the game directory, confirm the packed executable, then export the unpacked output.
+        </p>
+        <div class="actions">
+          <button id="choose-directory-button" type="button">Choose Directory</button>
+          <button id="extract-button" type="button" disabled>Extract</button>
+        </div>
+        <input id="directory-input" class="visually-hidden" type="file" webkitdirectory multiple>
+      </section>
+
+      <section class="panel details-panel" aria-labelledby="selection-heading">
+        <div class="section-heading">
+          <div>
+            <h2 id="selection-heading">Selection</h2>
+            <p id="selection-status" class="section-note is-neutral">No directory selected.</p>
+          </div>
+        </div>
+
+        <dl class="facts">
+          <div>
+            <dt>Directory</dt>
+            <dd id="directory-name">None</dd>
+          </div>
+          <div>
+            <dt>Files</dt>
+            <dd id="directory-file-count">0</dd>
+          </div>
+          <div>
+            <dt>Packed file</dt>
+            <dd id="packed-file-summary">None</dd>
+          </div>
+        </dl>
+
+        <label class="field-label" for="packed-file-select">Packed file</label>
+        <select id="packed-file-select" disabled>
+          <option value="">Select a directory first</option>
+        </select>
+
+        <label class="field-label" for="pe-variant-select">Executable format</label>
+        <select id="pe-variant-select">
+          <option value="9_70">9.70 layout</option>
+          <option value="10_70">10.70 layout</option>
+          <option value="7_80">7.80 layout</option>
+        </select>
+      </section>
+
+      <section class="panel output-panel" aria-labelledby="output-heading">
+        <div class="section-heading">
+          <div>
+            <h2 id="output-heading">Output</h2>
+            <p id="output-status" class="section-note is-neutral">Extracted output will appear here.</p>
+          </div>
+        </div>
+
+        <dl class="facts">
+          <div>
+            <dt>Unpacked files</dt>
+            <dd id="unpacked-file-count">0</dd>
+          </div>
+          <div>
+            <dt>Total size</dt>
+            <dd id="unpacked-size">0 B</dd>
+          </div>
+          <div>
+            <dt>Skipped for folder write</dt>
+            <dd id="unsafe-file-count">0</dd>
+          </div>
+        </dl>
+
+        <div id="output-actions" class="result-actions" hidden>
+          <button id="download-zip-button" type="button">Download ZIP</button>
+          <button id="write-folder-button" type="button">Write Safe Files to Directory</button>
+        </div>
+        <p id="filesystem-warning" class="warning-note" hidden>
+          Browser folder writing skips .exe and .dll files. Choose the same game folder when prompted;
+          update NW.js manually if the game runtime also needs replacement.
+        </p>
+      </section>
+
+      <section class="panel activity-panel" aria-labelledby="activity-heading">
+        <h2 id="activity-heading">Activity</h2>
+        <ol id="log-list" class="log-list">
+          <li class="log-entry info">Waiting for a directory selection.</li>
+        </ol>
+      </section>
+    </main>
+
+    <script type="module" src="./app.mjs"></script>
+  </body>
+</html>

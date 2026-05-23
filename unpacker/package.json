@@ -8,6 +8,9 @@
   "exports": {
     ".": "./unpacker.js"
   },
+  "scripts": {
+    "verify": "node verify-fixture.mjs"
+  },
   "bin": {
     "static-unpacker": "./cli.mjs"
   }
